@@ -1,0 +1,9 @@
+Modules
+1- Stock Candidate Selection : select set of candidates
+based no index, for ex.
+https://www.bankrate.com/investing/best-index-funds/
+2- Stock Ranking : generate some score and rank based on it
+For ex. Momentum based
+https://medium.com/codex/picking-stocks-with-a-quantitative-momentum-strategy-in-python-b15ac8925ec6
+3- BackTesting : back-test selected stocks on the set of portoflions
+Backtest info should be lazy / delayed and not realtime to avoid high latency
