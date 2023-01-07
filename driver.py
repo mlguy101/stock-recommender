@@ -49,7 +49,7 @@ if __name__ == '__main__':
     plt.plot(data[f'price_mavg_{big_window}'], label=f'price_mavg_{big_window}')
     plt.legend(loc="upper right")
     plt.savefig('fig.png')
-    # create signals
+    # create misc
     data['pos'] = data[[f'price_mavg_{small_window}', f'price_mavg_{big_window}']] \
         .apply(lambda x: 0 if x[0] < x[1] else 1, axis=1)
     data['pos_diff'] = data['pos'].diff()

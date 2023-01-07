@@ -1,0 +1,5 @@
+project struct
+https://docs.python-guide.org/writing/structure/
+
+ta libs
+https://github.com/nardew/talipp
