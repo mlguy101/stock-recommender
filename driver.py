@@ -11,5 +11,5 @@ if __name__ == '__main__':
     start = (date.today() - timedelta(days=180)).isoformat()
     end = date.today().isoformat()
     df = yf.download(tickers=ticker, start=start, end=end,interval=interval)
-    df = generate_y(df=df,ma_window=12)
+    df = generate_y(df=df,ma_window=5)
 
