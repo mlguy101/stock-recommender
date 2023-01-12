@@ -39,6 +39,10 @@ def get_signals(n, local_maxima_idx, local_minima_idx):
 
 class HyperParamLocalMinMaxStrategy(Strategy):
     prominence = 0.3
+    distance = 100
+
+    def __init__(self, broker, data, params):
+        super().__init__(broker, data, params)
 
     def init(self):
         dt_idx = self.data.df.index
@@ -46,10 +50,8 @@ class HyperParamLocalMinMaxStrategy(Strategy):
         window = 10
         ema = np.array([np.nan] * (window - 1) + EMA(period=window, input_values=close_data).output_values)
         assert len(ema) == len(dt_idx)
-        prominence = 0.8
-        distance = 10
-        local_maxima_idx, _ = find_peaks(x=ema, prominence=prominence, distance=distance)
-        local_minima_idx, _ = find_peaks(x=-ema, prominence=prominence, distance=distance)
+        local_maxima_idx, _ = find_peaks(x=ema, prominence=self.prominence, distance=self.distance)
+        local_minima_idx, _ = find_peaks(x=-ema, prominence=self.prominence, distance=self.distance)
         signals = get_signals(n=len(ema), local_maxima_idx=local_maxima_idx, local_minima_idx=local_minima_idx)
         self.signals_df = pd.DataFrame({'signals': signals})
         self.signals_df.index = dt_idx
@@ -68,15 +70,18 @@ class HyperParamLocalMinMaxStrategy(Strategy):
 
 
 if __name__ == '__main__':
-    # bt = Backtest(GOOG, SmaCross, commission=.002,
-    #               exclusive_orders=True)
-    ticker = 'AAPL'
-    interval = '60m'
-    end = date.today().isoformat()
-    start = (date.today() - timedelta(days=180)).isoformat()
-    df = yf.download(tickers=ticker, start=start, end=end, interval=interval)
-    bt = Backtest(data=df, strategy=HyperParamLocalMinMaxStrategy, commission=0.002, cash=10_000)
-    statsopt = bt.optimize(prominence=[0.1, 0.2, 0.4, 0.9], maximize='Equity Final [$]')
-    print(statsopt)
-    print('*****')
-    print(statsopt._strategy)
+    sp500 = pd.read_csv('SP500.csv', sep=',')
+    for symbol in sp500['Symbol']:
+        print(f'Symbol = {symbol}')
+        interval = '60m'
+        end = date.today().isoformat()
+        start = (date.today() - timedelta(days=180)).isoformat()
+        df = yf.download(tickers=symbol, start=start, end=end, interval=interval)
+        if df.shape[0] < 2 :
+            print(f'Cannot get data for symbol {symbol}')
+            continue
+        bt = Backtest(data=df, strategy=HyperParamLocalMinMaxStrategy, commission=0.005, cash=10_000)
+        statsopt = bt.optimize(prominence=[0.1, 0.2, 0.4, 0.9], distance=[10, 20, 30, 40, 50, 60, 70, 100, 150, 200],
+                               maximize='Equity Final [$]')
+        print(statsopt._strategy)
+        print('#################################################################')
