@@ -77,7 +77,7 @@ if __name__ == '__main__':
         end = date.today().isoformat()
         start = (date.today() - timedelta(days=180)).isoformat()
         df = yf.download(tickers=symbol, start=start, end=end, interval=interval)
-        if df.shape[0] < 2 :
+        if df.shape[0] < 2:
             print(f'Cannot get data for symbol {symbol}')
             continue
         bt = Backtest(data=df, strategy=HyperParamLocalMinMaxStrategy, commission=0.005, cash=10_000)
