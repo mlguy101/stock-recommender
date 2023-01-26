@@ -1,14 +1,16 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Iterable
+from typing import Iterable, List
 
 import numpy as np
 import pandas as pd
 import yfinance
 from backtesting import Strategy
+from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
-from talipp.indicators import EMA
+from talipp.indicators import EMA, SMA
+from peakdetect import peakdetect
 
 
 class TurningPoint(Enum):
@@ -27,25 +29,26 @@ class StrategyBuilder(ABC):
 
 
 class HyperParamLocalMinMaxStrategy(Strategy):
-    prominence = 0.3
-    distance = 100
-    width = 10
-    ma_window = 5
+    lookahead = 3
 
     def __init__(self, broker, data, params):
         super().__init__(broker, data, params)
-        self.signals_df = None
 
     def init(self):
+
+        ma_window = 3
         dt_idx = self.data.df.index
         close_data = self.data.Close.data
         ema = np.array(
-            [np.nan] * (self.ma_window - 1) + EMA(period=self.ma_window, input_values=close_data).output_values)
+            [np.nan] * (ma_window - 1) + EMA(period=ma_window, input_values=close_data).output_values)
         assert len(ema) == len(dt_idx)
-        local_maxima_idx, _ = find_peaks(x=ema, prominence=self.prominence, distance=self.distance, width=self.width)
-        local_minima_idx, _ = find_peaks(x=-ema, prominence=self.prominence, distance=self.distance, width=self.width)
-        signals = HyperParamLocalMinMaxStrategy.get_signals(n=len(ema), local_maxima_idx=local_maxima_idx,
-                                                            local_minima_idx=local_minima_idx)
+        # # https://stackoverflow.com/questions/1713335/peak-finding-algorithm-for-python-scipy
+        # # https://stackoverflow.com/a/64588944/5937273
+        peaks = peakdetect(y_axis=ema.data, lookahead=self.lookahead)
+        local_maxima = np.array(peaks[0])
+        local_minima = np.array(peaks[1])
+        signals = self.get_signals(n=len(ema), local_maxima_idx=local_maxima[:, 0],
+                                   local_minima_idx=local_minima[:, 0])
         self.signals_df = pd.DataFrame({'signals': signals})
         self.signals_df.index = dt_idx
 
@@ -54,11 +57,27 @@ class HyperParamLocalMinMaxStrategy(Strategy):
         signal = self.signals_df['signals'][dt]
         if signal == TurningPoint.LOCAL_MAXIMA:
             self.sell()
+            # n1 = len(self.trades)
+            # n2 = len(self.closed_trades)
+            # print(f'sell @ dt = {dt}, close = {self.data.Close[-1]}')
         elif signal == TurningPoint.LOCAL_MINIMA:
             self.buy()
+            # print(f'buy @ dt = {dt}, close = {self.data.Close[-1]}')
+
+    # def plot(self, ticker):
+    #     peaks = peakdetect(self.ema, lookahead=self.lookahead)
+    #     # Lookahead is the distance to look ahead from a peak to determine if it is the actual peak.
+    #     # Change lookahead as necessary
+    #     higherPeaks = np.array(peaks[0])
+    #     lowerPeaks = np.array(peaks[1])
+    #     plt.plot(self.ema)
+    #     plt.plot(higherPeaks[:, 0], higherPeaks[:, 1], 'ro')
+    #     plt.plot(lowerPeaks[:, 0], lowerPeaks[:, 1], 'ko')
+    #     plt.savefig(f'plots/plot_{ticker}.jpg')
+    #     plt.clf()
 
     @staticmethod
-    def get_signals(n: int, local_maxima_idx: Iterable[int], local_minima_idx: Iterable[int]):
+    def get_signals(n: int, local_maxima_idx: List[int], local_minima_idx: List[int]):
         """
 
         :param n:
@@ -67,6 +86,10 @@ class HyperParamLocalMinMaxStrategy(Strategy):
         :return:
         """
         signals = [None] * n
+        if len(local_maxima_idx) > 0 and len(local_minima_idx) > 0 and local_maxima_idx[0] < local_minima_idx[0]:
+            local_maxima_idx = local_maxima_idx[1:]
+        if len(local_maxima_idx) > 0 and len(local_minima_idx) > 0 and local_minima_idx[-1] > local_maxima_idx[-1]:
+            local_minima_idx = local_minima_idx[:-1]
         for i in range(n):
             if i in local_maxima_idx:
                 signals[i] = TurningPoint.LOCAL_MAXIMA

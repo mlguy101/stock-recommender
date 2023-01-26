@@ -71,17 +71,17 @@ class HyperParamLocalMinMaxStrategy(Strategy):
 
 if __name__ == '__main__':
     sp500 = pd.read_csv('SP500.csv', sep=',')
-    for symbol in sp500['Symbol']:
+    for symbol in ['AAPL']:
         print(f'Symbol = {symbol}')
         interval = '60m'
         end = date.today().isoformat()
-        start = (date.today() - timedelta(days=180)).isoformat()
+        start = (date.today() - timedelta(days=100)).isoformat()
         df = yf.download(tickers=symbol, start=start, end=end, interval=interval)
         if df.shape[0] < 2:
             print(f'Cannot get data for symbol {symbol}')
             continue
-        bt = Backtest(data=df, strategy=HyperParamLocalMinMaxStrategy, commission=0.005, cash=10_000)
+        bt = Backtest(data=df, strategy=HyperParamLocalMinMaxStrategy, commission=0.005, cash=10000)
         statsopt = bt.optimize(prominence=[0.1, 0.2, 0.4, 0.9], distance=[10, 20, 30, 40, 50, 60, 70, 100, 150, 200],
                                maximize='Equity Final [$]')
-        print(statsopt._strategy)
+        print(statsopt)
         print('#################################################################')
