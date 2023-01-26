@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 from tqdm import tqdm
-from ml.models_builder import LocalTurningMLStrategyBuilder, LocalTurningPointsModelBuilder
+from ml.models_builder import TurningModelBuilder, TurningPointsModelBuilder
 from datetime import timedelta
 
 
@@ -23,7 +23,7 @@ def generate_peak_hopt(tickers: List[str], start_datetime: str, end_datetime: st
         logger.info(f'Getting all tickers')
     for ticker in tqdm(tickers, desc='iterate over sp500'):
         logger.info(f'Getting peak hopt for ticker = {ticker}')
-        ltb = LocalTurningMLStrategyBuilder(ticker=ticker)
+        ltb = TurningModelBuilder(ticker=ticker)
         ret = ltb.peak_finder_hopt(start=start_datetime, end=end_datetime, interval=interval)
         opt_stats  = ret['opt_stats']
         logger.info(f'Optimal stats for ticker = {ticker} : \n {opt_stats}')
