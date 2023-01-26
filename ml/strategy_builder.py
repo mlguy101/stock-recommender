@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Iterable, List
+from typing import Iterable, List, Any
 
 import numpy as np
 import pandas as pd
@@ -14,9 +14,9 @@ from peakdetect import peakdetect
 
 
 class TurningPoint(Enum):
-    LOCAL_MAXIMA = 1
-    LOCAL_MINIMA = -1
-    NEITHER = 0
+    LOCAL_MAXIMA = 2
+    LOCAL_MINIMA = 0
+    NEITHER = 1
 
 
 class StrategyBuilder(ABC):
@@ -77,7 +77,7 @@ class HyperParamLocalMinMaxStrategy(Strategy):
     #     plt.clf()
 
     @staticmethod
-    def get_signals(n: int, local_maxima_idx: List[int], local_minima_idx: List[int]):
+    def get_signals(index: List[Any], local_maxima_idx: List[Any], local_minima_idx: List[Any])->pd.Series:
         """
 
         :param n:
@@ -85,12 +85,12 @@ class HyperParamLocalMinMaxStrategy(Strategy):
         :param local_minima_idx:
         :return:
         """
-        signals = [None] * n
+        signals = pd.Series([None] * len(index),index=index)
         if len(local_maxima_idx) > 0 and len(local_minima_idx) > 0 and local_maxima_idx[0] < local_minima_idx[0]:
             local_maxima_idx = local_maxima_idx[1:]
         if len(local_maxima_idx) > 0 and len(local_minima_idx) > 0 and local_minima_idx[-1] > local_maxima_idx[-1]:
             local_minima_idx = local_minima_idx[:-1]
-        for i in range(n):
+        for i in index:
             if i in local_maxima_idx:
                 signals[i] = TurningPoint.LOCAL_MAXIMA
             elif i in local_minima_idx:

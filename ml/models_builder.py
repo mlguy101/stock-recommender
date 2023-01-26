@@ -11,15 +11,17 @@
 10  -think about adding risk factor , this will control buy sell based on the accuracy  / confidence of the prediction
 """
 import logging
+
+import pandas as pd
 import plotly.express as px
 
 import numpy as np
 import yfinance
-from backtesting import Backtest, backtesting
-from matplotlib import pyplot as plt
-from scipy.signal import find_peaks
+from backtesting import Backtest
+from peakdetect import peakdetect
+from sklearn.metrics import accuracy_score
 from talipp.indicators import EMA
-
+from xgboost import XGBClassifier
 from ml.strategy_builder import StrategyBuilder, HyperParamLocalMinMaxStrategy
 
 
@@ -70,14 +72,12 @@ class LocalTurningMLStrategyBuilder(StrategyBuilder):
 
 
 class LocalTurningPointsModelBuilder:
-    def __init__(self, ticker, target_ma_window, width, prominence, distance):
+    def __init__(self, ticker, target_ma_window, lookahead):
         self.ticker = ticker
-        self.width = width
-        self.prominence = prominence
-        self.distance = distance
+        self.lookahead = lookahead
         self.target_ma_window = target_ma_window
 
-    def generate_feature_matrix(self, start_datetime, end_datetime, interval):
+    def train_model(self, start_datetime, end_datetime, interval):
         # def get ohlc data
         # generate signals  (X or features)
 
@@ -97,17 +97,50 @@ class LocalTurningPointsModelBuilder:
         # get raw ohlc data
         df = yfinance.download(tickers=self.ticker, start=start_datetime, end=end_datetime, interval=interval)
         # Generate X in features
-        features_mtx = {}
+        feature_mtx = {}
         # Generate EMA
-        periods = [5, 10]
-        for period in periods:
+        features_periods = [5, 10, 20]
+        for period in features_periods:
             tmp = EMA(period=period, input_values=df['Adj Close'].values)
             ema = [np.nan] * (period - 1)
             ema.extend(tmp)
-            features_mtx[f'ema_{period}'] = ema
+            feature_mtx[f'ema_{period}'] = pd.Series(ema, index=df.index)  # get Y
 
-    # get Y
+        peak = peakdetect(y_axis=df['Adj Close'], x_axis=df.index, lookahead=self.lookahead)
+        assert len(peak) == 2, "peak array must be 2D"
+        local_maxima = np.array(peak[0])
+        local_minima = np.array(peak[1])
+        Y = HyperParamLocalMinMaxStrategy.get_signals(index=list(df.index), local_minima_idx=list(local_minima[:, 0]),
+                                                      local_maxima_idx=list(local_maxima[:, 0]))
+        Y_num = list(map(lambda x: x.value.real, Y))
+        X_cols = ['ema_5', 'ema_10', 'ema_20']
+        feature_mtx['Y'] = Y
+        feature_mtx['Datetime'] = df.index.values
+        feature_mtx_df = pd.DataFrame(feature_mtx)
+        diff1 = feature_mtx_df[X_cols].diff(periods=1)
+        diff2 = feature_mtx_df[X_cols].diff(periods=2)
+        feature_mtx_df = pd.merge(left=feature_mtx_df, right=diff1, left_index=True, right_index=True,
+                                  suffixes=('', '_diff1'))
+        feature_mtx_df = pd.merge(left=feature_mtx_df, right=diff2, left_index=True, right_index=True,
+                                  suffixes=('', '_diff2'))
 
-    def build_local_turning_point_prediction_model(self):
-        # model must predict y along with confidence level in prediction
-        pass
+        feature_mtx_df_reduced = feature_mtx_df[['ema_5', 'ema_10', 'ema_20', 'ema_5_diff1', 'ema_10_diff1',
+                                                 'ema_20_diff1', 'ema_5_diff2', 'ema_10_diff2', 'ema_20_diff2']]
+        N = feature_mtx_df_reduced.shape[0]
+        N_train = int(round(0.8*N))
+
+        X_train = feature_mtx_df_reduced.iloc[:N_train]
+        X_test = feature_mtx_df_reduced.iloc[N_train:]
+        Y_num_train = Y_num[:N_train]
+        Y_num_test = Y_num[N_train:]
+
+        model = XGBClassifier()
+        bst  = model.fit(X_train, Y_num_train)
+        y_pred = model.predict(X_test)
+        predictions = [round(value) for value in y_pred]
+        accuracy = accuracy_score(Y_num_test, predictions)
+        scores = bst.feature_importances_
+        scores_df = pd.DataFrame({'features':X_train.columns,'score':scores})
+        scores_df.sort_values(by='score',ascending=False,inplace=True)
+        print("Accuracy: %.2f%%" % (accuracy * 100.0))
+        print("")
