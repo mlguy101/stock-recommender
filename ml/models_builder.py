@@ -139,5 +139,5 @@ class TurningPointsModelBuilder:
         scores = bst.feature_importances_
         scores_df = pd.DataFrame({'features': X_train.columns, 'score': scores})
         scores_df.sort_values(by='score', ascending=False, inplace=True)
-        print("Accuracy: %.2f%%" % (accuracy * 100.0))
-        return bst
+
+        return bst, accuracy
