@@ -72,10 +72,12 @@ class TurningModelBuilder(StrategyBuilder):
 
 
 class TurningPointsModelBuilder:
-    def __init__(self, target_ma_window, lookahead):
+    def __init__(self, ticker,target_ma_window,lookahead,delta):
         self.lookahead = lookahead
         self.target_ma_window = target_ma_window
-
+        self.logger = logging.getLogger()
+        self.ticker = ticker
+        self.delta = delta
     def train_model(self, df):
         # def get ohlc data
         # generate signals  (X or features)
@@ -104,10 +106,13 @@ class TurningPointsModelBuilder:
         ema.extend(tmp)
         feature_mtx[f'ema_{period}'] = pd.Series(ema, index=df.index)  # get Y
 
-        peak = peakdetect(y_axis=df['Adj Close'], x_axis=df.index, lookahead=self.lookahead)
+        peak = peakdetect(y_axis=df['Adj Close'], x_axis=df.index, lookahead=self.lookahead,delta=self.delta)
         assert len(peak) == 2, "peak array must be 2D"
+
         local_maxima = np.array(peak[0])
         local_minima = np.array(peak[1])
+        self.logger.info(f'ticker = {self.ticker} number of local maxima = {len(local_maxima)}')
+        self.logger.info(f'ticker = {self.ticker} number of local minima = {len(local_minima)}')
         Y = HyperParamLocalMinMaxStrategy.get_signals(index=list(df.index), local_minima_idx=list(local_minima[:, 0]),
                                                       local_maxima_idx=list(local_maxima[:, 0]))
         Y_num = list(map(lambda x: x.value.real, Y))
@@ -124,7 +129,7 @@ class TurningPointsModelBuilder:
 
         feature_mtx_df_reduced = feature_mtx_df[['ema_5', 'ema_5_diff1', 'ema_5_diff2']]
         N = feature_mtx_df_reduced.shape[0]
-        N_train = int(round(0.8 * N))
+        N_train = int(round(0.9 * N))
 
         X_train = feature_mtx_df_reduced.iloc[:N_train]
         X_test = feature_mtx_df_reduced.iloc[N_train:]
@@ -139,5 +144,4 @@ class TurningPointsModelBuilder:
         scores = bst.feature_importances_
         scores_df = pd.DataFrame({'features': X_train.columns, 'score': scores})
         scores_df.sort_values(by='score', ascending=False, inplace=True)
-
         return bst, accuracy

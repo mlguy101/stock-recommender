@@ -45,13 +45,22 @@ class MLTurningPointStrategy(Strategy):
 from ml.models_builder import TurningPointsModelBuilder
 from ml.strategy_builder import HyperParamLocalMinMaxStrategy, TurningPoint
 
+
+# TODO
+"""
+1. Measure Accuracy for local minima and maxima only (not normal points)
+2. add one condition for buy , strong uptrend
+3. buy with fraction of cash (10%) 
+4. deeper in peakdetect algo 
+"""
 if __name__ == '__main__':
     # params #
     features_ema_window = 5
     target_ema_window = 3
     look_ahead = 2
+    delta = 0.2
     end_day_test = date.today()
-    start_day_test = end_day_test - timedelta(28)  # test last week
+    start_day_test = end_day_test - timedelta(120)  # test last week
     end_day_train = start_day_test - timedelta(1)
     start_day_train = end_day_train - timedelta(150)
 
@@ -81,9 +90,9 @@ if __name__ == '__main__':
         if train_df.shape[0] < min_data or test_df.shape[0] < min_data:
             logger.error(f'Cannot get data')
             continue
-        model = TurningPointsModelBuilder(target_ma_window=target_ema_window, lookahead=look_ahead)
+        model = TurningPointsModelBuilder(ticker=ticker,target_ma_window=target_ema_window, lookahead=look_ahead,delta=delta)
         boost_model, accuracy = model.train_model(df=train_df)
-        bt = Backtest(data=train_df, strategy=MLTurningPointStrategy, commission=commission, exclusive_orders=True,
+        bt = Backtest(data=test_df, strategy=MLTurningPointStrategy, commission=commission, exclusive_orders=True,
                       cash=start_cash)
         bt_stats = bt.run(boost_model=boost_model, features_ema_window=features_ema_window)
         logger.info(f'ticker = {ticker},bt_stats : \n {bt_stats}')
