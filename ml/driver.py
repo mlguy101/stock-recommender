@@ -8,6 +8,8 @@ from datetime import date, timedelta
 from backtesting import Backtest, Strategy
 from talipp.indicators import EMA
 
+from ml.models_builder import TurningPoint, TurningPointsModelBuilder
+
 
 class MLTurningPointStrategy(Strategy):
     boost_model = None
@@ -42,16 +44,15 @@ class MLTurningPointStrategy(Strategy):
                 self.sell()
 
 
-from ml.models_builder import TurningPointsModelBuilder
-from ml.strategy_builder import HyperParamLocalMinMaxStrategy, TurningPoint
 
 
 # TODO
 """
 1. Measure Accuracy for local minima and maxima only (not normal points)
-2. add one condition for buy , strong uptrend
-3. buy with fraction of cash (10%) 
-4. deeper in peakdetect algo 
+2. Measure precision recall for local_maxima and local_minima , separately
+3. add one condition for buy , strong uptrend
+4. buy with fraction of cash (10%) 
+5. deeper in peakdetect algo 
 """
 if __name__ == '__main__':
     # params #
@@ -90,7 +91,8 @@ if __name__ == '__main__':
         if train_df.shape[0] < min_data or test_df.shape[0] < min_data:
             logger.error(f'Cannot get data')
             continue
-        model = TurningPointsModelBuilder(ticker=ticker,target_ma_window=target_ema_window, lookahead=look_ahead,delta=delta)
+        model = TurningPointsModelBuilder(ticker=ticker, target_ma_window=target_ema_window, lookahead=look_ahead,
+                                          delta=delta)
         boost_model, accuracy = model.train_model(df=train_df)
         bt = Backtest(data=test_df, strategy=MLTurningPointStrategy, commission=commission, exclusive_orders=True,
                       cash=start_cash)
